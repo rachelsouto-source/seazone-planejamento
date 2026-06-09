@@ -62,12 +62,20 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
   const [modalTask, setModalTask] = useState(undefined)
   const [confirmDelete, setConfirmDelete] = useState(null)
 
+  async function refreshTasks() {
+    const { data } = await supabase.from('tasks').select('*').order('created_at', { ascending: true })
+    setTasks(data || [])
+    setLoading(false)
+  }
+
   useEffect(() => {
-    const unsub = subscribeTasks(list => {
-      setTasks(list)
-      setLoading(false)
-    })
-    return unsub
+    refreshTasks()
+    if (!isDemo && supabase) {
+      const channel = supabase.channel('tasks-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, refreshTasks)
+        .subscribe()
+      return () => supabase.removeChannel(channel)
+    }
   }, [])
 
   async function handleSave(data) {
@@ -78,11 +86,13 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
       await addTask(data)
     }
     setModalTask(undefined)
+    await refreshTasks()
   }
 
   async function handleDelete(id) {
     await removeTask(id)
     setConfirmDelete(null)
+    await refreshTasks()
   }
 
   function handleLogout() {
