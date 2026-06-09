@@ -239,17 +239,18 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
                     <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sem tarefas no momento.</p>
                   </div>
                 ) : (
+                  <div className="table-scroll">
                   <table>
                     <thead>
                       <tr>
-                        <th>Empreendimento / Contexto</th>
-                        <th>Tarefa</th>
-                        <th>Observações</th>
-                        <th>Status</th>
-                        <th>Data Inicial</th>
-                        <th>Data Entrega</th>
-                        <th style={{ textAlign: 'center' }}>Duração (dias úteis)</th>
-                        <th></th>
+                        <th className="col-emp">Empreendimento / Contexto</th>
+                        <th className="col-task">Tarefa</th>
+                        <th className="col-obs">Observações</th>
+                        <th className="col-status">Status</th>
+                        <th className="col-date">Data Inicial</th>
+                        <th className="col-date">Data Entrega</th>
+                        <th className="col-dur">Duração (dias úteis)</th>
+                        <th className="col-actions"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -257,35 +258,35 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
                         const overdue = isOverdue(task.vencimento, task.status)
                         return (
                           <tr key={task.id}>
-                            <td>
+                            <td className="col-emp">
                               {task.empreendimento
                                 ? <span className="empreendimento-tag">{task.empreendimento}</span>
                                 : <span style={{ color: 'var(--text-muted)' }}>—</span>
                               }
                             </td>
-                            <td className="td-task">
+                            <td className="col-task td-task">
                               <div className="task-name">{task.tarefa}</div>
                             </td>
-                            <td className="td-obs">
+                            <td className="col-obs">
                               {task.observacao
-                                ? <span className="task-obs">{task.observacao}</span>
+                                ? <span className="task-obs" style={{ fontSize: 12, color: 'var(--muted)' }}>{task.observacao}</span>
                                 : <span style={{ color: 'var(--text-muted)' }}>—</span>
                               }
                             </td>
-                            <td>
+                            <td className="col-status">
                               <span className={`status-badge ${STATUS_CLASS[task.status] || 'status-nao-iniciada'}`}>
                                 {task.status}
                               </span>
                             </td>
-                            <td><span className="date-text">{fmtDate(task.dataInicial)}</span></td>
-                            <td><span className="date-text">{fmtDate(task.dataFinal)}</span></td>
-                            <td style={{ textAlign: 'center' }}>
+                            <td className="col-date"><span className="date-text">{fmtDate(task.dataInicial)}</span></td>
+                            <td className="col-date"><span className="date-text">{fmtDate(task.dataFinal)}</span></td>
+                            <td className="col-dur">
                               {task.duracao
                                 ? <span className="duration-chip">{task.duracao}</span>
                                 : <span style={{ color: 'var(--text-muted)' }}>—</span>
                               }
                             </td>
-                            <td>
+                            <td className="col-actions">
                               <div className="actions-cell">
                                 <button
                                   className="icon-btn icon-btn-edit"
@@ -304,6 +305,7 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             </div>
