@@ -23,20 +23,29 @@ const tasksBus  = makeLocalBus('seazone_tasks')
 const dailyBus  = makeLocalBus('seazone_dailies')
 
 // ── TASKS ─────────────────────────────────────────────
+const tasksCallbacks = []
+
+function notifyTasks() {
+  supabase.from('tasks').select('*').order('created_at', { ascending: true })
+    .then(({ data }) => tasksCallbacks.forEach(cb => cb(data || [])))
+}
+
 export function subscribeTasks(callback) {
   if (isDemo) return tasksBus.subscribe(callback)
 
+  tasksCallbacks.push(callback)
   supabase.from('tasks').select('*').order('created_at', { ascending: true })
     .then(({ data }) => callback(data || []))
 
   const channel = supabase.channel('tasks-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
-      supabase.from('tasks').select('*').order('created_at', { ascending: true })
-        .then(({ data }) => callback(data || []))
-    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, notifyTasks)
     .subscribe()
 
-  return () => supabase.removeChannel(channel)
+  return () => {
+    supabase.removeChannel(channel)
+    const i = tasksCallbacks.indexOf(callback)
+    if (i >= 0) tasksCallbacks.splice(i, 1)
+  }
 }
 
 export async function addTask(data) {
@@ -45,6 +54,7 @@ export async function addTask(data) {
     tasksBus.notify(); return
   }
   await supabase.from('tasks').insert([data])
+  notifyTasks()
 }
 
 export async function updateTask(id, data) {
@@ -53,6 +63,7 @@ export async function updateTask(id, data) {
     tasksBus.notify(); return
   }
   await supabase.from('tasks').update(data).eq('id', id)
+  notifyTasks()
 }
 
 export async function removeTask(id) {
@@ -61,23 +72,33 @@ export async function removeTask(id) {
     tasksBus.notify(); return
   }
   await supabase.from('tasks').delete().eq('id', id)
+  notifyTasks()
 }
 
 // ── DAILIES ───────────────────────────────────────────
+const dailiesCallbacks = []
+
+function notifyDailies() {
+  supabase.from('dailies').select('*').order('data', { ascending: false })
+    .then(({ data }) => dailiesCallbacks.forEach(cb => cb(data || [])))
+}
+
 export function subscribeDailies(callback) {
   if (isDemo) return dailyBus.subscribe(callback)
 
+  dailiesCallbacks.push(callback)
   supabase.from('dailies').select('*').order('data', { ascending: false })
     .then(({ data }) => callback(data || []))
 
   const channel = supabase.channel('dailies-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'dailies' }, () => {
-      supabase.from('dailies').select('*').order('data', { ascending: false })
-        .then(({ data }) => callback(data || []))
-    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dailies' }, notifyDailies)
     .subscribe()
 
-  return () => supabase.removeChannel(channel)
+  return () => {
+    supabase.removeChannel(channel)
+    const i = dailiesCallbacks.indexOf(callback)
+    if (i >= 0) dailiesCallbacks.splice(i, 1)
+  }
 }
 
 export async function addDaily(data) {
@@ -86,6 +107,7 @@ export async function addDaily(data) {
     dailyBus.notify(); return
   }
   await supabase.from('dailies').insert([data])
+  notifyDailies()
 }
 
 export async function updateDaily(id, data) {
@@ -94,6 +116,7 @@ export async function updateDaily(id, data) {
     dailyBus.notify(); return
   }
   await supabase.from('dailies').update(data).eq('id', id)
+  notifyDailies()
 }
 
 export async function removeDaily(id) {
@@ -102,4 +125,5 @@ export async function removeDaily(id) {
     dailyBus.notify(); return
   }
   await supabase.from('dailies').delete().eq('id', id)
+  notifyDailies()
 }
