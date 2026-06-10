@@ -8,6 +8,7 @@ import KPIPanel from './KPIPanel'
 import TaskModal from './TaskModal'
 import DailySection from './DailySection'
 import DashboardTab from './DashboardTab'
+import GanttTab from './GanttTab'
 
 const MEMBERS = ['Arthur', 'Julia', 'Raquel']
 
@@ -24,6 +25,16 @@ const STATUS_CLASS = {
   'Concluída': 'status-concluida',
   'Em atraso': 'status-atrasada',
   'Pausada': 'status-pausada',
+}
+
+// Ordem de exibição: iniciadas primeiro, depois não iniciadas
+const STATUS_SORT = {
+  'Iniciada no prazo': 0,
+  'Iniciada':          0,
+  'Em atraso':         1,
+  'Pausada':           2,
+  'Não iniciada':      3,
+  'Concluída':         4,
 }
 
 function fmtDate(str) {
@@ -57,6 +68,7 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('planejamento')
+  const [planView, setPlanView] = useState('ativas')   // 'ativas' | 'concluidas'
   const [filter, setFilter] = useState('Todos')
   const [search, setSearch] = useState('')
   const [modalTask, setModalTask] = useState(undefined)
@@ -115,8 +127,12 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
 
   const groups = (filter === 'Todos' ? MEMBERS : [filter]).map(m => ({
     member: m,
-    tasks: filtered.filter(t => t.membro === m),
+    tasks: filtered
+      .filter(t => t.membro === m && (planView === 'concluidas' ? t.status === 'Concluída' : t.status !== 'Concluída'))
+      .sort((a, b) => (STATUS_SORT[a.status] ?? 3) - (STATUS_SORT[b.status] ?? 3)),
   }))
+
+  const totalConcluidas = tasks.filter(t => t.status === 'Concluída').length
 
   if (loading) {
     return (
@@ -131,7 +147,6 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
     <>
       <Header displayName={displayName} onLogout={handleLogout} isDemo={isDemo} />
 
-      {/* Tab nav */}
       <div className="page-tabs-bar">
         <div className="page-tabs">
           <button
@@ -139,6 +154,12 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
             onClick={() => setTab('planejamento')}
           >
             📋 Planejamento
+          </button>
+          <button
+            className={`page-tab${tab === 'gantt' ? ' active' : ''}`}
+            onClick={() => setTab('gantt')}
+          >
+            📅 Gantt
           </button>
           <button
             className={`page-tab${tab === 'dashboard' ? ' active' : ''}`}
@@ -170,8 +191,29 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
 
         {tab === 'dashboard' && <DashboardTab tasks={tasks} />}
 
+        {tab === 'gantt' && <GanttTab tasks={tasks} />}
+
         {tab === 'planejamento' && <>
         <KPIPanel tasks={tasks} />
+
+        {/* Sub-abas: Em andamento / Concluídas */}
+        <div className="plan-view-bar">
+          <button
+            className={`plan-view-btn${planView === 'ativas' ? ' active' : ''}`}
+            onClick={() => setPlanView('ativas')}
+          >
+            Em andamento
+          </button>
+          <button
+            className={`plan-view-btn${planView === 'concluidas' ? ' active' : ''}`}
+            onClick={() => setPlanView('concluidas')}
+          >
+            Concluídas
+            {totalConcluidas > 0 && (
+              <span className="plan-view-badge">{totalConcluidas}</span>
+            )}
+          </button>
+        </div>
 
         <div className="toolbar">
           <div className="toolbar-left">
@@ -195,15 +237,22 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
             />
           </div>
 
-          <button className="btn btn-secondary" onClick={() => setModalTask(null)}>
-            + Nova Tarefa
-          </button>
+          {planView === 'ativas' && (
+            <button className="btn btn-secondary" onClick={() => setModalTask(null)}>
+              + Nova Tarefa
+            </button>
+          )}
         </div>
 
         {groups.every(g => g.tasks.length === 0) && search ? (
           <div className="empty-state">
             <div className="empty-state-icon">🔍</div>
             <p>Nenhuma tarefa encontrada para "{search}".</p>
+          </div>
+        ) : groups.every(g => g.tasks.length === 0) ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">{planView === 'concluidas' ? '✅' : '📋'}</div>
+            <p>{planView === 'concluidas' ? 'Nenhuma tarefa concluída ainda.' : 'Sem tarefas em andamento.'}</p>
           </div>
         ) : (
           groups.map(({ member, tasks: memberTasks }) => (
@@ -218,16 +267,12 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
                 <span className="team-count">
                   {memberTasks.length} tarefa{memberTasks.length !== 1 ? 's' : ''}
                 </span>
-                {memberTasks.length > 0 && (
+                {memberTasks.length > 0 && planView === 'ativas' && (
                   <span className="team-meta">
-                    {memberTasks.filter(t => t.status === 'Concluída').length} concluída(s)
                     {memberTasks.filter(t => isOverdue(t.vencimento, t.status)).length > 0 && (
-                      <>
-                        {' · '}
-                        <span style={{ color: 'var(--err)' }}>
-                          {memberTasks.filter(t => isOverdue(t.vencimento, t.status)).length} em atraso
-                        </span>
-                      </>
+                      <span style={{ color: 'var(--err)' }}>
+                        {memberTasks.filter(t => isOverdue(t.vencimento, t.status)).length} em atraso
+                      </span>
                     )}
                   </span>
                 )}
@@ -249,7 +294,7 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
                         <th className="col-status">Status</th>
                         <th className="col-date">Data Inicial</th>
                         <th className="col-date">Data Entrega</th>
-                        <th className="col-dur">Duração (dias úteis)</th>
+                        <th className="col-dur">Dias úteis</th>
                         <th className="col-actions"></th>
                       </tr>
                     </thead>
