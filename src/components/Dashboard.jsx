@@ -129,7 +129,13 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
     member: m,
     tasks: filtered
       .filter(t => t.membro === m && (planView === 'concluidas' ? t.status === 'Concluída' : t.status !== 'Concluída'))
-      .sort((a, b) => (STATUS_SORT[a.status] ?? 3) - (STATUS_SORT[b.status] ?? 3)),
+      .sort((a, b) => {
+        const sd = (STATUS_SORT[a.status] ?? 3) - (STATUS_SORT[b.status] ?? 3)
+        if (sd !== 0) return sd
+        const ad = a.dataFinal ? parseISO(a.dataFinal).getTime() : Infinity
+        const bd = b.dataFinal ? parseISO(b.dataFinal).getTime() : Infinity
+        return ad - bd
+      }),
   }))
 
   const totalConcluidas = tasks.filter(t => t.status === 'Concluída').length
