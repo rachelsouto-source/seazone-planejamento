@@ -2,15 +2,13 @@ import { useState, useEffect } from 'react'
 import { parseISO, isValid, format, differenceInCalendarDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-const MEMBERS = ['Rachel', 'Arthur', 'Julia', 'Raquel', 'Caroline', 'Vinicius']
+const MEMBERS = ['Rachel', 'Arthur', 'Julia', 'Raquel']
 
 const COLORS = {
-  Rachel:   '#e11d48',
-  Arthur:   '#0a7d3c',
-  Julia:    '#7c3aed',
-  Raquel:   '#2f5597',
-  Caroline: '#c45000',
-  Vinicius: '#0e7490',
+  Rachel: '#e11d48',
+  Arthur: '#0a7d3c',
+  Julia:  '#7c3aed',
+  Raquel: '#2f5597',
 }
 
 const LS_KEY = 'seazone_ferias'
