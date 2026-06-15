@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { parseISO, isValid, format, differenceInCalendarDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { supabase } from '../supabase'
 
 const MEMBERS = ['Rachel', 'Arthur', 'Julia', 'Raquel', 'Caroline', 'Vinicius']
 
@@ -14,25 +13,21 @@ const COLORS = {
   Vinicius: '#0e7490',
 }
 
-const SQL_CREATE = `-- Cole no SQL Editor do Supabase e execute:
-create table if not exists ferias (
-  id uuid primary key default gen_random_uuid(),
-  membro text not null,
-  inicio date not null,
-  fim date not null,
-  observacao text,
-  created_at timestamptz default now()
-);
-alter table ferias enable row level security;
-create policy "public_ferias" on ferias
-  for all using (true) with check (true);`
+const LS_KEY = 'seazone_ferias'
+
+function loadFerias() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
+}
+function saveFerias(data) {
+  localStorage.setItem(LS_KEY, JSON.stringify(data))
+}
 
 function buildYear(year) {
   const start = new Date(year, 0, 1)
   const end   = new Date(year, 11, 31)
   const total = differenceInCalendarDays(end, start) + 1
   const months = Array.from({ length: 12 }, (_, i) => {
-    const d   = new Date(year, i, 1)
+    const d    = new Date(year, i, 1)
     const dEnd = new Date(year, i + 1, 0)
     return {
       label: format(d, 'MMM', { locale: ptBR }),
@@ -67,9 +62,7 @@ function findOverlaps(ferias) {
       if (!isValid(aS) || !isValid(aE) || !isValid(bS) || !isValid(bE)) continue
       const oS = aS > bS ? aS : bS
       const oE = aE < bE ? aE : bE
-      if (oS <= oE) {
-        result.push({ members: [a.membro, b.membro], oS, oE })
-      }
+      if (oS <= oE) result.push({ members: [a.membro, b.membro], oS, oE })
     }
   }
   return result
@@ -79,12 +72,9 @@ const EMPTY_FORM = { membro: 'Rachel', inicio: '', fim: '', observacao: '' }
 
 export default function FeriasTab() {
   const [year, setYear] = useState(new Date().getFullYear())
-  const [ferias, setFerias] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [sqlError, setSqlError] = useState(false)
+  const [ferias, setFerias] = useState(loadFerias)
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
 
   const { start, total, months } = buildYear(year)
@@ -92,66 +82,39 @@ export default function FeriasTab() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const todayPct = differenceInCalendarDays(today, start) / total * 100
 
-  async function load() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('ferias').select('*').order('inicio', { ascending: true })
-    if (error) { setSqlError(true); setLoading(false); return }
-    setFerias(data || [])
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [])
-
   const yearFerias = ferias.filter(f => {
     if (!f.inicio) return false
-    const y = parseISO(f.inicio).getFullYear()
-    return y === year || parseISO(f.fim).getFullYear() === year
+    return parseISO(f.inicio).getFullYear() === year ||
+           parseISO(f.fim).getFullYear() === year
   })
 
   const overlaps = findOverlaps(yearFerias)
 
-  function openAdd() { setForm(EMPTY_FORM); setModal('add') }
+  function openAdd()  { setForm(EMPTY_FORM); setModal('add') }
   function openEdit(f) { setForm({ membro: f.membro, inicio: f.inicio, fim: f.fim, observacao: f.observacao || '' }); setModal(f) }
 
-  async function handleSave() {
+  function handleSave() {
     if (!form.inicio || !form.fim) return
-    setSaving(true)
+    let updated
     if (modal === 'add') {
-      await supabase.from('ferias').insert([form])
+      updated = [...ferias, { ...form, id: crypto.randomUUID(), created_at: new Date().toISOString() }]
     } else {
-      await supabase.from('ferias').update(form).eq('id', modal.id)
+      updated = ferias.map(f => f.id === modal.id ? { ...f, ...form } : f)
     }
-    setSaving(false)
+    saveFerias(updated)
+    setFerias(updated)
     setModal(null)
-    load()
   }
 
-  async function handleDelete(id) {
-    await supabase.from('ferias').delete().eq('id', id)
+  function handleDelete(id) {
+    const updated = ferias.filter(f => f.id !== id)
+    saveFerias(updated)
+    setFerias(updated)
     setConfirmDel(null)
-    load()
   }
 
-  function f(str) { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM') : '?' }
-  function fFull(str) { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM/yyyy') : '?' }
-
-  if (loading) return <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
-
-  if (sqlError) return (
-    <div className="ferias-sql-card">
-      <p style={{ fontWeight: 700, color: 'var(--err)', marginBottom: 10 }}>
-        ⚠️ Tabela "ferias" não encontrada no Supabase.
-      </p>
-      <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--muted)' }}>
-        Abra o Supabase → SQL Editor → cole o código abaixo e clique em Run:
-      </p>
-      <pre className="ferias-sql-pre">{SQL_CREATE}</pre>
-      <button className="btn btn-secondary" style={{ marginTop: 14 }} onClick={load}>
-        Já executei — tentar novamente
-      </button>
-    </div>
-  )
+  function fFmt(str)     { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM')       : '?' }
+  function fFull(str)    { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM/yyyy')   : '?' }
 
   return (
     <div>
@@ -177,7 +140,7 @@ export default function FeriasTab() {
             {' '}
             {overlaps.map((o, i) => (
               <span key={i} className="ferias-overlap-chip">
-                {o.members.join(' & ')} · {f(o.oS.toISOString())}–{f(o.oE.toISOString())}
+                {o.members.join(' & ')} · {fFmt(o.oS.toISOString())}–{fFmt(o.oE.toISOString())}
               </span>
             ))}
           </span>
@@ -186,7 +149,6 @@ export default function FeriasTab() {
 
       {/* Gantt */}
       <div className="g-wrap" style={{ marginBottom: 20 }}>
-        {/* Month header */}
         <div className="g-row g-header-row">
           <div className="g-name g-name-header">Membro</div>
           <div className="g-bar-area g-header-area">
@@ -204,19 +166,16 @@ export default function FeriasTab() {
           return (
             <div key={member} className="g-row g-task-row">
               <div className="g-name" style={{ borderLeft: `4px solid ${COLORS[member] || '#aaa'}` }}>
-                <span className="g-task-name" style={{ color: COLORS[member] || 'var(--ink)' }}>
-                  {member}
-                </span>
+                <span className="g-task-name" style={{ color: COLORS[member] || 'var(--ink)' }}>{member}</span>
                 <span className="g-task-emp">
-                  {mf.length === 0 ? 'sem férias cadastradas' : `${mf.length} período${mf.length > 1 ? 's' : ''}`}
+                  {mf.length === 0 ? 'sem férias' : `${mf.length} período${mf.length > 1 ? 's' : ''}`}
                 </span>
               </div>
               <div className="g-bar-area ferias-lane">
-                {/* Overlap zones */}
                 {overlaps.map((o, i) => (
                   <div key={i} className="ferias-overlap-zone"
                     style={{
-                      left: `${toPct(o.oS.toISOString().slice(0,10), start, total)}%`,
+                      left:  `${toPct(o.oS.toISOString().slice(0,10), start, total)}%`,
                       width: `${toWidth(o.oS.toISOString().slice(0,10), o.oE.toISOString().slice(0,10), total)}%`,
                     }}
                   />
@@ -227,14 +186,14 @@ export default function FeriasTab() {
                     key={fv.id}
                     className="ferias-bar"
                     style={{
-                      left: `${toPct(fv.inicio, start, total)}%`,
-                      width: `${toWidth(fv.inicio, fv.fim, total)}%`,
+                      left:       `${toPct(fv.inicio, start, total)}%`,
+                      width:      `${toWidth(fv.inicio, fv.fim, total)}%`,
                       background: COLORS[member] || '#666',
                     }}
                     title={`${member}: ${fFull(fv.inicio)} → ${fFull(fv.fim)}${fv.observacao ? '\n' + fv.observacao : ''}\nClique para editar`}
                     onClick={() => openEdit(fv)}
                   >
-                    <span className="ferias-bar-text">{f(fv.inicio)}–{f(fv.fim)}</span>
+                    <span className="ferias-bar-text">{fFmt(fv.inicio)}–{fFmt(fv.fim)}</span>
                   </div>
                 ))}
               </div>
@@ -244,7 +203,7 @@ export default function FeriasTab() {
       </div>
 
       {/* List */}
-      {yearFerias.length > 0 && (
+      {yearFerias.length > 0 ? (
         <div className="table-wrapper">
           <table style={{ tableLayout: 'auto' }}>
             <thead>
@@ -262,12 +221,12 @@ export default function FeriasTab() {
                 const dias = isValid(parseISO(fv.inicio)) && isValid(parseISO(fv.fim))
                   ? differenceInCalendarDays(parseISO(fv.fim), parseISO(fv.inicio)) + 1
                   : '—'
-                const isOverlap = overlaps.some(o =>
+                const hasOverlap = overlaps.some(o =>
                   o.members.includes(fv.membro) &&
                   parseISO(fv.inicio) <= o.oE && parseISO(fv.fim) >= o.oS
                 )
                 return (
-                  <tr key={fv.id} style={isOverlap ? { background: '#fff5f5' } : {}}>
+                  <tr key={fv.id} style={hasOverlap ? { background: '#fff5f5' } : {}}>
                     <td>
                       <span className="ferias-dot" style={{ background: COLORS[fv.membro] || '#aaa' }} />
                       <strong>{fv.membro}</strong>
@@ -278,8 +237,8 @@ export default function FeriasTab() {
                     <td style={{ color: 'var(--muted)', fontSize: 12 }}>{fv.observacao || '—'}</td>
                     <td>
                       <div className="actions-cell">
-                        <button className="icon-btn icon-btn-edit" title="Editar" onClick={() => openEdit(fv)}>✏️</button>
-                        <button className="icon-btn icon-btn-delete" title="Excluir" onClick={() => setConfirmDel(fv)}>🗑</button>
+                        <button className="icon-btn icon-btn-edit" onClick={() => openEdit(fv)}>✏️</button>
+                        <button className="icon-btn icon-btn-delete" onClick={() => setConfirmDel(fv)}>🗑</button>
                       </div>
                     </td>
                   </tr>
@@ -288,9 +247,7 @@ export default function FeriasTab() {
             </tbody>
           </table>
         </div>
-      )}
-
-      {yearFerias.length === 0 && (
+      ) : (
         <div className="empty-state">
           <div className="empty-state-icon">🏖️</div>
           <p>Nenhuma férias cadastrada para {year}.</p>
@@ -298,7 +255,7 @@ export default function FeriasTab() {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Modal add/edit */}
       {modal !== null && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 440 }}>
@@ -336,9 +293,9 @@ export default function FeriasTab() {
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
               <button className="btn btn-secondary"
-                disabled={!form.inicio || !form.fim || saving}
+                disabled={!form.inicio || !form.fim}
                 onClick={handleSave}>
-                {saving ? 'Salvando...' : 'Salvar'}
+                Salvar
               </button>
             </div>
           </div>
