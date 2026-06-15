@@ -9,6 +9,7 @@ import TaskModal from './TaskModal'
 import DailySection from './DailySection'
 import DashboardTab from './DashboardTab'
 import GanttTab from './GanttTab'
+import FeriasTab from './FeriasTab'
 
 const MEMBERS = ['Arthur', 'Julia', 'Raquel']
 
@@ -174,6 +175,12 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
             📊 Dashboard
           </button>
           <button
+            className={`page-tab${tab === 'ferias' ? ' active' : ''}`}
+            onClick={() => setTab('ferias')}
+          >
+            🏖️ Férias
+          </button>
+          <button
             className={`page-tab${tab === 'dailys' ? ' active' : ''}`}
             onClick={() => setTab('dailys')}
           >
@@ -198,6 +205,8 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
         {tab === 'dashboard' && <DashboardTab tasks={tasks} />}
 
         {tab === 'gantt' && <GanttTab tasks={tasks} />}
+
+        {tab === 'ferias' && <FeriasTab />}
 
         {tab === 'planejamento' && <>
         <KPIPanel tasks={tasks} />
