@@ -276,7 +276,7 @@ export default function FeriasTab() {
                     onChange={e => setForm(p => ({ ...p, inicio: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="form-label">Data de retorno</label>
+                  <label className="form-label">Último dia de férias</label>
                   <input type="date" className="form-input" value={form.fim}
                     onChange={e => setForm(p => ({ ...p, fim: e.target.value }))} />
                 </div>
