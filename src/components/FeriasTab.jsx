@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { parseISO, isValid, format, differenceInCalendarDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { supabase } from '../supabase'
 
 const MEMBERS = ['Rachel', 'Arthur', 'Julia', 'Raquel']
 
@@ -11,14 +12,17 @@ const COLORS = {
   Raquel: '#2f5597',
 }
 
-const LS_KEY = 'seazone_ferias'
-
-function loadFerias() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]') } catch { return [] }
-}
-function saveFerias(data) {
-  localStorage.setItem(LS_KEY, JSON.stringify(data))
-}
+const SQL_CREATE = `create table if not exists ferias (
+  id uuid primary key default gen_random_uuid(),
+  membro text not null,
+  inicio date not null,
+  fim date not null,
+  observacao text,
+  created_at timestamptz default now()
+);
+alter table ferias enable row level security;
+create policy "public_ferias" on ferias
+  for all using (true) with check (true);`
 
 function buildYear(year) {
   const start = new Date(year, 0, 1)
@@ -70,15 +74,30 @@ const EMPTY_FORM = { membro: 'Rachel', inicio: '', fim: '', observacao: '' }
 
 export default function FeriasTab() {
   const [year, setYear] = useState(new Date().getFullYear())
-  const [ferias, setFerias] = useState(loadFerias)
+  const [ferias, setFerias] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [sqlError, setSqlError] = useState(false)
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
 
   const { start, total, months } = buildYear(year)
 
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const todayPct = differenceInCalendarDays(today, start) / total * 100
+
+  async function load() {
+    setLoading(true)
+    setSqlError(false)
+    const { data, error } = await supabase
+      .from('ferias').select('*').order('inicio', { ascending: true })
+    if (error) { setSqlError(true); setLoading(false); return }
+    setFerias(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
 
   const yearFerias = ferias.filter(f => {
     if (!f.inicio) return false
@@ -88,31 +107,47 @@ export default function FeriasTab() {
 
   const overlaps = findOverlaps(yearFerias)
 
-  function openAdd()  { setForm(EMPTY_FORM); setModal('add') }
+  function openAdd()   { setForm(EMPTY_FORM); setModal('add') }
   function openEdit(f) { setForm({ membro: f.membro, inicio: f.inicio, fim: f.fim, observacao: f.observacao || '' }); setModal(f) }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.inicio || !form.fim) return
-    let updated
+    setSaving(true)
     if (modal === 'add') {
-      updated = [...ferias, { ...form, id: crypto.randomUUID(), created_at: new Date().toISOString() }]
+      await supabase.from('ferias').insert([form])
     } else {
-      updated = ferias.map(f => f.id === modal.id ? { ...f, ...form } : f)
+      await supabase.from('ferias').update(form).eq('id', modal.id)
     }
-    saveFerias(updated)
-    setFerias(updated)
+    setSaving(false)
     setModal(null)
+    load()
   }
 
-  function handleDelete(id) {
-    const updated = ferias.filter(f => f.id !== id)
-    saveFerias(updated)
-    setFerias(updated)
+  async function handleDelete(id) {
+    await supabase.from('ferias').delete().eq('id', id)
     setConfirmDel(null)
+    load()
   }
 
-  function fFmt(str)     { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM')       : '?' }
-  function fFull(str)    { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM/yyyy')   : '?' }
+  function fFmt(str)  { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM')      : '?' }
+  function fFull(str) { return isValid(parseISO(str)) ? format(parseISO(str), 'dd/MM/yyyy') : '?' }
+
+  if (loading) return <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
+
+  if (sqlError) return (
+    <div className="ferias-sql-card">
+      <p style={{ fontWeight: 700, color: 'var(--err)', marginBottom: 10 }}>
+        ⚠️ Tabela "ferias" não encontrada no Supabase.
+      </p>
+      <p style={{ fontSize: 13, marginBottom: 12, color: 'var(--muted)' }}>
+        Abra o Supabase → SQL Editor → cole o código abaixo e clique em Run:
+      </p>
+      <pre className="ferias-sql-pre">{SQL_CREATE}</pre>
+      <button className="btn btn-secondary" style={{ marginTop: 14 }} onClick={load}>
+        Já executei — tentar novamente
+      </button>
+    </div>
+  )
 
   return (
     <div>
@@ -291,9 +326,9 @@ export default function FeriasTab() {
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
               <button className="btn btn-secondary"
-                disabled={!form.inicio || !form.fim}
+                disabled={!form.inicio || !form.fim || saving}
                 onClick={handleSave}>
-                Salvar
+                {saving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>
