@@ -101,25 +101,12 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
   }, [])
 
   async function handleSave(data) {
-    const save = async (payload, isUpdate, id) => {
-      const q = isUpdate
-        ? supabase.from('tasks').update(payload).eq('id', id)
-        : supabase.from('tasks').insert([payload])
-      const { error } = await q
-      if (error && error.message?.includes('prioridade')) {
-        // coluna ainda não existe → salva sem o campo
-        const { prioridade, ...rest } = payload
-        const q2 = isUpdate
-          ? supabase.from('tasks').update(rest).eq('id', id)
-          : supabase.from('tasks').insert([rest])
-        await q2
-      }
-    }
-    if (data.id) {
-      const { id, ...rest } = data
-      await save(rest, true, id)
+    // Remove prioridade until the column is created in Supabase
+    const { prioridade: _pri, id, ...fields } = data
+    if (id) {
+      await supabase.from('tasks').update(fields).eq('id', id)
     } else {
-      await save(data, false, null)
+      await supabase.from('tasks').insert([fields])
     }
     setModalTask(undefined)
     await refreshTasks()
