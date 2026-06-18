@@ -188,14 +188,39 @@ tbody tr:hover{background:#f5f7fc;}
 tbody tr:last-child td{border-bottom:none;}
 
 /* Larguras fixas das colunas */
-.col-emp   { width: 18%; }
-.col-task  { width: 14%; }
-.col-obs   { width: 22%; }
-.col-status{ width: 13%; }
-.col-date  { width: 10%; }
-.col-dur   { width: 9%; text-align:center; }
-th.col-dur { white-space:normal; line-height:1.3; }
-.col-actions{ width: 8%; text-align:center; }
+.col-pri    { width: 7%;  text-align:center; }
+.col-emp    { width: 15%; }
+.col-task   { width: 12%; }
+.col-obs    { width: 20%; }
+.col-status { width: 13%; }
+.col-date   { width: 9%;  }
+.col-dur    { width: 7%;  text-align:center; }
+th.col-dur  { white-space:normal; line-height:1.3; }
+.col-actions{ width: 7%;  text-align:center; }
+
+/* ── PRIORITY BADGES ──────────────────────────────── */
+.pri-badge{
+  display:inline-block;padding:2px 8px;border-radius:20px;
+  font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;
+}
+.pri-urgente{ background:#fde8e8; color:#b91c1c; }
+.pri-alta   { background:#fff0e6; color:#c2410c; }
+.pri-media  { background:#fefce8; color:#a16207; }
+.pri-baixa  { background:#eff6ff; color:#1d4ed8; }
+
+/* ── PRIORITY PICKER (modal) ──────────────────────── */
+.priority-picker{ display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; }
+.priority-btn{
+  padding:5px 12px;border-radius:20px;border:1.5px solid var(--line);
+  background:var(--bg);font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .15s;color:var(--muted);
+}
+.priority-btn:hover{ border-color:var(--blue); color:var(--blue); }
+.priority-btn.priority-urgente.active{ background:#fde8e8; border-color:#b91c1c; color:#b91c1c; }
+.priority-btn.priority-alta.active   { background:#fff0e6; border-color:#c2410c; color:#c2410c; }
+.priority-btn.priority-média.active  { background:#fefce8; border-color:#a16207; color:#a16207; }
+.priority-btn.priority-baixa.active  { background:#eff6ff; border-color:#1d4ed8; color:#1d4ed8; }
+.priority-btn.priority-none.active   { background:#f1f5f9; border-color:#94a3b8; color:#64748b; }
 
 td.col-obs, td.col-task {
   white-space: normal;

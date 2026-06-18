@@ -44,10 +44,13 @@ function calcDuration(dataInicial, dataFinal) {
   return String(count)
 }
 
+const PRIORITY_OPTIONS = ['', 'Urgente', 'Alta', 'Média', 'Baixa']
+
 const EMPTY = {
   membro: '',
   empreendimento: '',
   tarefa: '',
+  prioridade: '',
   status: 'Não iniciada',
   dataInicial: '',
   vencimento: '',
@@ -155,25 +158,30 @@ export default function TaskModal({ task, onSave, onClose }) {
 
           <div className="form-row">
             <div className="form-group">
+              <label>Prioridade</label>
+              <div className="priority-picker">
+                {PRIORITY_OPTIONS.map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`priority-btn priority-${(p || 'none').toLowerCase()}${form.prioridade === p ? ' active' : ''}`}
+                    onClick={() => set('prioridade', p)}
+                  >
+                    {p || '—'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
               <label>Status</label>
               <select value={form.status} onChange={e => set('status', e.target.value)}>
                 {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
-
-            <div className="form-group">
-              <label>Duração (dias)</label>
-              <input
-                type="number"
-                min="1"
-                placeholder="Ex: 5"
-                value={form.duracao}
-                onChange={e => set('duracao', e.target.value)}
-              />
-            </div>
           </div>
 
-          <div className="form-row">
+          <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
             <div className="form-group">
               <label>Data Inicial</label>
               <input
@@ -181,7 +189,6 @@ export default function TaskModal({ task, onSave, onClose }) {
                 value={form.dataInicial}
                 onChange={e => set('dataInicial', e.target.value)}
               />
-              <span style={{ display: 'block', fontSize: 11, marginTop: 4, visibility: 'hidden' }}>placeholder</span>
             </div>
 
             <div className="form-group">
@@ -197,6 +204,17 @@ export default function TaskModal({ task, onSave, onClose }) {
               }}>
                 ✓ calculada automaticamente
               </span>
+            </div>
+
+            <div className="form-group">
+              <label>Duração (dias úteis)</label>
+              <input
+                type="number"
+                min="1"
+                placeholder="Ex: 5"
+                value={form.duracao}
+                onChange={e => set('duracao', e.target.value)}
+              />
             </div>
           </div>
 

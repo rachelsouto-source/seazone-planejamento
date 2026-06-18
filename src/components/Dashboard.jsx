@@ -28,6 +28,15 @@ const STATUS_CLASS = {
   'Pausada': 'status-pausada',
 }
 
+const PRIORITY_SORT = { 'Urgente': 0, 'Alta': 1, 'Média': 2, 'Baixa': 3 }
+
+const PRIORITY_CLASS = {
+  'Urgente': 'pri-urgente',
+  'Alta':    'pri-alta',
+  'Média':   'pri-media',
+  'Baixa':   'pri-baixa',
+}
+
 // Ordem de exibição: iniciadas primeiro, depois não iniciadas
 const STATUS_SORT = {
   'Iniciada no prazo': 0,
@@ -131,6 +140,8 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
     tasks: filtered
       .filter(t => t.membro === m && (planView === 'concluidas' ? t.status === 'Concluída' : t.status !== 'Concluída'))
       .sort((a, b) => {
+        const pd = (PRIORITY_SORT[a.prioridade] ?? 4) - (PRIORITY_SORT[b.prioridade] ?? 4)
+        if (pd !== 0) return pd
         const sd = (STATUS_SORT[a.status] ?? 3) - (STATUS_SORT[b.status] ?? 3)
         if (sd !== 0) return sd
         const ad = a.dataFinal ? parseISO(a.dataFinal).getTime() : Infinity
@@ -303,6 +314,7 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
                   <table>
                     <thead>
                       <tr>
+                        <th className="col-pri">Prioridade</th>
                         <th className="col-emp">Empreendimento / Contexto</th>
                         <th className="col-task">Tarefa</th>
                         <th className="col-obs">Observações</th>
@@ -318,6 +330,12 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
                         const overdue = isOverdue(task.vencimento, task.status)
                         return (
                           <tr key={task.id}>
+                            <td className="col-pri">
+                              {task.prioridade
+                                ? <span className={`pri-badge ${PRIORITY_CLASS[task.prioridade] || ''}`}>{task.prioridade}</span>
+                                : <span style={{ color: 'var(--text-muted)' }}>—</span>
+                              }
+                            </td>
                             <td className="col-emp">
                               {task.empreendimento
                                 ? <span className="empreendimento-tag">{task.empreendimento}</span>
