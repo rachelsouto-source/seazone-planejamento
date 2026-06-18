@@ -101,8 +101,7 @@ export default function Dashboard({ user, displayName, isDemo, onDemoLogout }) {
   }, [])
 
   async function handleSave(data) {
-    // Remove prioridade until the column is created in Supabase
-    const { prioridade: _pri, id, ...fields } = data
+    const { id, ...fields } = data
     if (id) {
       await supabase.from('tasks').update(fields).eq('id', id)
     } else {
