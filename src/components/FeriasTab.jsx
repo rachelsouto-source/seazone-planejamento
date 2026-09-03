@@ -81,6 +81,7 @@ export default function FeriasTab() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
+  const [saveError, setSaveError] = useState(null)
 
   const { start, total, months } = buildYear(year)
 
@@ -107,24 +108,38 @@ export default function FeriasTab() {
 
   const overlaps = findOverlaps(yearFerias)
 
-  function openAdd()   { setForm(EMPTY_FORM); setModal('add') }
-  function openEdit(f) { setForm({ membro: f.membro, inicio: f.inicio, fim: f.fim, observacao: f.observacao || '' }); setModal(f) }
+  function openAdd()   { setSaveError(null); setForm(EMPTY_FORM); setModal('add') }
+  function openEdit(f) { setSaveError(null); setForm({ membro: f.membro, inicio: f.inicio, fim: f.fim, observacao: f.observacao || '' }); setModal(f) }
+  function closeModal()   { setSaveError(null); setModal(null) }
+  function closeConfirm() { setSaveError(null); setConfirmDel(null) }
 
   async function handleSave() {
     if (!form.inicio || !form.fim) return
     setSaving(true)
-    if (modal === 'add') {
-      await supabase.from('ferias').insert([form])
-    } else {
-      await supabase.from('ferias').update(form).eq('id', modal.id)
-    }
+    setSaveError(null)
+    const { error } = modal === 'add'
+      ? await supabase.from('ferias').insert([form])
+      : await supabase.from('ferias').update(form).eq('id', modal.id)
     setSaving(false)
+    if (error) {
+      setSaveError(error.message || 'Não foi possível salvar. Tente novamente.')
+      return
+    }
+    // o período salvo pode cair em outro ano — leva a visão para lá, senão o
+    // registro some do calendário e parece que nada foi salvo
+    const savedStart = parseISO(form.inicio)
+    if (isValid(savedStart) && savedStart.getFullYear() !== year) setYear(savedStart.getFullYear())
     setModal(null)
     load()
   }
 
   async function handleDelete(id) {
-    await supabase.from('ferias').delete().eq('id', id)
+    setSaveError(null)
+    const { error } = await supabase.from('ferias').delete().eq('id', id)
+    if (error) {
+      setSaveError(error.message || 'Não foi possível excluir. Tente novamente.')
+      return
+    }
     setConfirmDel(null)
     load()
   }
@@ -294,7 +309,7 @@ export default function FeriasTab() {
           <div className="modal" style={{ maxWidth: 440 }}>
             <div className="modal-header">
               <h3>{modal === 'add' ? '🏖️ Adicionar Férias' : '✏️ Editar Férias'}</h3>
-              <button className="modal-close" onClick={() => setModal(null)}>×</button>
+              <button className="modal-close" onClick={closeModal}>×</button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
@@ -322,9 +337,14 @@ export default function FeriasTab() {
                   value={form.observacao}
                   onChange={e => setForm(p => ({ ...p, observacao: e.target.value }))} />
               </div>
+              {saveError && (
+                <div className="ferias-alert" style={{ margin: 0 }}>
+                  <span>⚠️</span><span>{saveError}</span>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
+              <button className="btn btn-ghost" onClick={closeModal}>Cancelar</button>
               <button className="btn btn-secondary"
                 disabled={!form.inicio || !form.fim || saving}
                 onClick={handleSave}>
@@ -341,13 +361,18 @@ export default function FeriasTab() {
           <div className="modal" style={{ maxWidth: 380 }}>
             <div className="modal-header">
               <h3>Confirmar exclusão</h3>
-              <button className="modal-close" onClick={() => setConfirmDel(null)}>×</button>
+              <button className="modal-close" onClick={closeConfirm}>×</button>
             </div>
             <div className="modal-body">
               <p>Excluir férias de <strong>{confirmDel.membro}</strong> ({fFull(confirmDel.inicio)} a {fFull(confirmDel.fim)})?</p>
+              {saveError && (
+                <div className="ferias-alert" style={{ marginTop: 12 }}>
+                  <span>⚠️</span><span>{saveError}</span>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setConfirmDel(null)}>Cancelar</button>
+              <button className="btn btn-ghost" onClick={closeConfirm}>Cancelar</button>
               <button className="btn btn-danger" onClick={() => handleDelete(confirmDel.id)}>Excluir</button>
             </div>
           </div>
